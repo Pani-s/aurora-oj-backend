@@ -1,0 +1,71 @@
+package com.pani.oj.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.pani.oj.common.BaseResponse;
+import com.pani.oj.model.dto.question.QuestionEditRequest;
+import com.pani.oj.model.dto.question.QuestionQueryRequest;
+import com.pani.oj.model.dto.question.QuestionUpdateRequest;
+import com.pani.oj.model.entity.Question;
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.pani.oj.model.vo.QuestionVO;
+import org.springframework.web.bind.annotation.RequestBody;
+
+import javax.servlet.http.HttpServletRequest;
+
+/**
+* @author Pani
+* @description 针对表【question(题目)】的数据库操作Service
+* @createDate 2024-03-06 12:30:26
+*/
+public interface QuestionService extends IService<Question> {
+    /**
+     * 校验
+     *
+     * @param question
+     * @param add
+     */
+    void validQuestion(Question question, boolean add);
+
+    /**
+     * 获取查询条件
+     *
+     * @param questionQueryRequest
+     * @return
+     */
+    QueryWrapper<Question> getQueryWrapper(QuestionQueryRequest questionQueryRequest);
+
+    /**
+     * 获取帖子封装
+     *
+     * @param question
+     * @return
+     */
+    QuestionVO getQuestionVO(Question question);
+//    QuestionVO getQuestionVO(Question question, HttpServletRequest request);
+    //todo getQuestionVO ---HttpServletRequest
+
+    /**
+     * 分页获取帖子封装
+     *
+     * @param questionPage
+     * @param request
+     * @return
+     */
+    Page<QuestionVO> getQuestionVOPage(Page<Question> questionPage, HttpServletRequest request);
+
+    /**
+     * 编辑题目的信息（普通用户自己）
+     * @param questionEditRequest
+     * @return 成功失败
+     */
+    Boolean editQuestion(QuestionEditRequest questionEditRequest, HttpServletRequest request);
+
+    /**
+     * 更新题目的信息（仅管理员）
+     *
+     * @param questionUpdateRequest
+     * @return 成功失败
+     */
+    Boolean updateQuestion(QuestionUpdateRequest questionUpdateRequest);
+}

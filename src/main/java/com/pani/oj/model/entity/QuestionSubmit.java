@@ -3,22 +3,18 @@ package com.pani.oj.model.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.io.Serializable;
 import java.util.Date;
 import lombok.Data;
 
 /**
- * 用户
- *
- * @author pani
- * 
+ * 题目提交
+ * @TableName question_submit
  */
-@TableName(value = "user")
+@TableName(value ="question_submit")
 @Data
-public class User implements Serializable {
-
+public class QuestionSubmit implements Serializable {
     /**
      * id
      */
@@ -26,34 +22,34 @@ public class User implements Serializable {
     private Long id;
 
     /**
-     * 用户账号
+     * 编程语言
      */
-    private String userAccount;
+    private String language;
 
     /**
-     * 用户密码
+     * 用户代码
      */
-    private String userPassword;
+    private String code;
 
     /**
-     * 用户昵称
+     * 判题信息（json 对象）比如失败原因
      */
-    private String userName;
+    private String judgeInfo;
 
     /**
-     * 用户头像
+     * 判题状态（0 - 待判题、1 - 判题中、2 - 成功、3 - 失败）
      */
-    private String userAvatar;
+    private Integer status;
 
     /**
-     * 用户简介
+     * 题目 id
      */
-    private String userProfile;
+    private Long questionId;
 
     /**
-     * 用户角色：user/admin/ban
+     * 提交用户 id
      */
-    private String userRole;
+    private Long userId;
 
     /**
      * 创建时间
@@ -68,7 +64,7 @@ public class User implements Serializable {
     /**
      * 是否删除
      */
-    @TableLogic
+    @TableId
     private Integer isDelete;
 
     @TableField(exist = false)
