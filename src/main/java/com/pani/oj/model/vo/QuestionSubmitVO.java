@@ -1,6 +1,7 @@
 package com.pani.oj.model.vo;
 
 import cn.hutool.json.JSONUtil;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.pani.oj.model.dto.questionsubmit.JudgeInfo;
 import com.pani.oj.model.entity.QuestionSubmit;
 import lombok.Data;
@@ -53,11 +54,13 @@ public class QuestionSubmitVO {
     /**
      * 创建时间
      */
+    @JsonFormat(locale = "zh", timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
     private Date createTime;
 
     /**
      * 更新时间
      */
+    @JsonFormat(locale = "zh", timezone = "GMT+8", pattern = "yyyy-MM-dd HH:mm:ss")
     private Date updateTime;
     
     /**

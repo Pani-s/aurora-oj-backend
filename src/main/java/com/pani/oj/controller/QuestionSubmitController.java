@@ -9,6 +9,7 @@ import com.pani.oj.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.pani.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.pani.oj.model.entity.QuestionSubmit;
 import com.pani.oj.model.entity.User;
+import com.pani.oj.model.vo.QuestionSubmitVO;
 import com.pani.oj.model.vo.QuestionVO;
 import com.pani.oj.service.QuestionService;
 import com.pani.oj.service.QuestionSubmitService;
@@ -66,8 +67,8 @@ public class QuestionSubmitController {
      * @param request
      */
     @PostMapping("/list/page")
-    public BaseResponse<Page<QuestionVO>> listFavourQuestionByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
-            HttpServletRequest request) {
+    public BaseResponse<Page<QuestionSubmitVO>> listFavourQuestionByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
+                                                                         HttpServletRequest request) {
         if (questionSubmitQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
