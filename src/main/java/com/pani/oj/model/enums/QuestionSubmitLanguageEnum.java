@@ -18,8 +18,8 @@ public enum QuestionSubmitLanguageEnum {
      * 题目提交 语言 持续更新中——
      */
     JAVA("java", "java"),
-    CPP("c++", "c++"),
-    GOLANG("golang", "golang");
+    CPP("cpp", "cpp"),
+    GOLANG("golang", "go");
 
 
     private final String text;

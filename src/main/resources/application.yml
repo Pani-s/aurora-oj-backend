@@ -21,28 +21,28 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${pani.mysql.host}:3306/${pani.mysql.dbname}?useUnicode=true&serverTimezone=Asia/Shanghai
-    username: ${pani.mysql.user}
+    username: ${pani.mysql.user:root}
     password: ${pani.mysql.pwd}
   # Redis 配置
   # todo 需替换配置，然后取消注释
-#  redis:
-#    database: 1
-#    host: ${pani.redis.host}
-#    port: 6379
-#    timeout: 5000
-#    password: ${pani.redis.pwd}
+  #  redis:
+  #    database: 1
+  #    host: ${pani.redis.host}
+  #    port: 6379
+  #    timeout: 5000
+  #    password: ${pani.redis.pwd}
   # rabbitmq 配置
-#  rabbitmq:
-#    host: ${pani.rabbitmq.host}
-#    port: 5672
-#    username: pani
-#    password: ${pani.rabbitmq.pwd}
+  #  rabbitmq:
+  #    host: ${pani.rabbitmq.host}
+  #    port: 5672
+  #    username: pani
+  #    password: ${pani.rabbitmq.pwd}
   # Elasticsearch 配置
   # todo 需替换配置，然后取消注释
-#  elasticsearch:
-#    uris: http://${pani.es.uris-host}:9200
-#    username: ${pani.es.username}
-#    password: ${pani.es.pwd}
+  #  elasticsearch:
+  #    uris: http://${pani.es.uris-host}:9200
+  #    username: ${pani.es.username}
+  #    password: ${pani.es.pwd}
   # 文件上传
   servlet:
     multipart:
@@ -89,3 +89,6 @@ yuapi:
   client:
     access-key: ${pani.ai.yuapi.access-key}
     secret-key: ${pani.ai.yuapi.secret-key}
+
+codeSandbox:
+  type: remote

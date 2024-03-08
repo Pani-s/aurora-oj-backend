@@ -16,7 +16,7 @@ public enum JudgeInfoMessageEnum {
      * 判题信息消息 类型 枚举
      */
     ACCEPTED("成功", "Accepted"),
-    WAITING("Waiting", "等待中"),
+    WAITING("等待中", "Waiting"),
     /**
      * 错误五花八门
      */

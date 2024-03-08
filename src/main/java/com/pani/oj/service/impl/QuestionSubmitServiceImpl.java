@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.pani.oj.common.ErrorCode;
 import com.pani.oj.constant.CommonConstant;
 import com.pani.oj.exception.BusinessException;
+import com.pani.oj.judge.JudgeService;
+import com.pani.oj.mapper.QuestionSubmitMapper;
 import com.pani.oj.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.pani.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.pani.oj.model.entity.Question;
@@ -14,38 +16,45 @@ import com.pani.oj.model.entity.User;
 import com.pani.oj.model.enums.QuestionSubmitLanguageEnum;
 import com.pani.oj.model.enums.QuestionSubmitStatusEnum;
 import com.pani.oj.model.vo.QuestionSubmitVO;
-import com.pani.oj.model.vo.QuestionVO;
-import com.pani.oj.model.vo.UserVO;
 import com.pani.oj.service.QuestionService;
 import com.pani.oj.service.QuestionSubmitService;
-import com.pani.oj.mapper.QuestionSubmitMapper;
 import com.pani.oj.service.UserService;
 import com.pani.oj.utils.SqlUtils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
-* @author Pani
-* @description 针对表【question_submit(题目提交)】的数据库操作Service实现
-* @createDate 2024-03-06 12:30:40
-*/
+ * @author Pani
+ * @description 针对表【question_submit(题目提交)】的数据库操作Service实现
+ * @createDate 2024-03-06 12:30:40
+ */
 @Service
 public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper, QuestionSubmit>
-    implements QuestionSubmitService{
+        implements QuestionSubmitService {
 
     @Resource
     private QuestionService questionService;
 
     @Resource
     private UserService userService;
+
+    /*
+    todo: 有循环依赖 加了@Lazy 还是想个办法解决一下
+    https://blog.csdn.net/WX10301075WX/article/details/123904543
+     */
+
+    @Resource
+    @Lazy
+    private JudgeService judgeService;
 
 
     @Override
@@ -74,10 +83,18 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         questionSubmit.setStatus(QuestionSubmitStatusEnum.WAITING.getValue());
         questionSubmit.setJudgeInfo("{}");
         boolean save = this.save(questionSubmit);
-        if (!save){
+        if (!save) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "数据插入失败");
         }
-        return questionSubmit.getId();
+        Long questionSubmitId = questionSubmit.getId();
+
+        // todo : 执行判题服务
+        CompletableFuture.runAsync(() -> {
+            judgeService.doJudge(questionSubmitId);
+        });
+        return questionSubmitId;
+
+        //        return questionSubmit.getId();
     }
 
     @Override
@@ -114,13 +131,13 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         if (!userId1.equals(questionSubmit.getUserId()) && !userService.isAdmin(loginUser)) {
             questionSubmitVO.setCode(null);
         }
-//        Long userId = questionSubmit.getUserId();
-//        User user = null;
-//        if (userId != null && userId > 0) {
-//            user = userService.getById(userId);
-//        }
-//        UserVO userVO = userService.getUserVO(user);
-//        questionSubmitVO.setUserVO(userVO);
+        //        Long userId = questionSubmit.getUserId();
+        //        User user = null;
+        //        if (userId != null && userId > 0) {
+        //            user = userService.getById(userId);
+        //        }
+        //        UserVO userVO = userService.getUserVO(user);
+        //        questionSubmitVO.setUserVO(userVO);
         //返回
         return questionSubmitVO;
     }
