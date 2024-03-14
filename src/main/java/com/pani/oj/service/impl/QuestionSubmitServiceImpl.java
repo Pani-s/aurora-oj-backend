@@ -88,13 +88,13 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         }
         Long questionSubmitId = questionSubmit.getId();
 
-        // todo : 执行判题服务
+        //异步执行判题服务
         CompletableFuture.runAsync(() -> {
+            System.out.println("执行判题服务");
             judgeService.doJudge(questionSubmitId);
         });
-        return questionSubmitId;
 
-        //        return questionSubmit.getId();
+        return questionSubmitId;
     }
 
     @Override
@@ -107,7 +107,8 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         Long questionId = questionSubmitQueryRequest.getQuestionId();
         Integer status = questionSubmitQueryRequest.getStatus();
         Long userId = questionSubmitQueryRequest.getUserId();
-        String sortField = questionSubmitQueryRequest.getSortField();
+//        String sortField = questionSubmitQueryRequest.getSortField();
+        String sortField = "updateTime";
         String sortOrder = questionSubmitQueryRequest.getSortOrder();
 
         // 拼接查询条件
@@ -125,7 +126,7 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     @Override
     public QuestionSubmitVO getQuestionSubmitVO(QuestionSubmit questionSubmit, User loginUser) {
         QuestionSubmitVO questionSubmitVO = QuestionSubmitVO.objToVo(questionSubmit);
-        // 脱敏：仅【本人和管理员】能看见自己（提交 userId 和登录用户 id 不同）提交的代码
+        // 脱敏：仅【本人和管理员】能看见自己（提交 userId 和登录用户 id 不同）提交的代码 todo：现在感觉又可以看，不过这个方法目前没人用
         // 1. 关联查询用户信息
         Long userId1 = loginUser.getId();
         if (!userId1.equals(questionSubmit.getUserId()) && !userService.isAdmin(loginUser)) {
@@ -150,29 +151,33 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         if (CollectionUtils.isEmpty(questionSubmitList)) {
             return questionVOPage;
         }
-        // 1. 关联查询用户/题目信息
+
+        /*
+        batch查比单独查性能高很多 嗯嗯\(^_^)/
+         */
+        // 关联查询用户信息
         Set<Long> userIdSet = questionSubmitList.stream().map(QuestionSubmit::getUserId).collect(Collectors.toSet());
-        Set<Long> questionIdSet = questionSubmitList.stream().map(QuestionSubmit::getQuestionId).collect(Collectors.toSet());
+//        Set<Long> questionIdSet = questionSubmitList.stream().map(QuestionSubmit::getQuestionId).collect(Collectors.toSet());
         Map<Long, List<User>> userIdUserListMap = userService.listByIds(userIdSet).stream()
                 .collect(Collectors.groupingBy(User::getId));
-        Map<Long, List<Question>> questionIdUserListMap = questionService.listByIds(questionIdSet).stream()
-                .collect(Collectors.groupingBy(Question::getId));
+//        Map<Long, List<Question>> questionIdUserListMap = questionService.listByIds(questionIdSet).stream()
+//                .collect(Collectors.groupingBy(Question::getId));
 
         // 填充信息
         List<QuestionSubmitVO> questionSubmitVOList = questionSubmitList.stream().map(questionSubmit -> {
             QuestionSubmitVO questionSubmitVO = QuestionSubmitVO.objToVo(questionSubmit);
             Long userId = questionSubmit.getUserId();
-            Long questionId = questionSubmit.getQuestionId();
+//            Long questionId = questionSubmit.getQuestionId();
             User user = null;
             if (userIdUserListMap.containsKey(userId)) {
                 user = userIdUserListMap.get(userId).get(0);
             }
-            Question question = null;
-            if (questionIdUserListMap.containsKey(questionId)) {
-                question = questionIdUserListMap.get(questionId).get(0);
-            }
+//            Question question = null;
+//            if (questionIdUserListMap.containsKey(questionId)) {
+//                question = questionIdUserListMap.get(questionId).get(0);
+//            }
             questionSubmitVO.setUserVO(userService.getUserVO(user));
-            questionSubmitVO.setQuestionVO(questionService.getQuestionVO(question));
+//            questionSubmitVO.setQuestionVO(questionService.getQuestionVO(question));
             return questionSubmitVO;
         }).collect(Collectors.toList());
 

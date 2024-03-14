@@ -2,10 +2,11 @@ package com.pani.oj.judge.strategy;
 
 import com.pani.oj.model.dto.question.JudgeCase;
 import com.pani.oj.model.dto.question.JudgeConfig;
-import com.pani.oj.model.dto.questionsubmit.JudgeInfo;
+import com.pani.oj.judge.codesandbox.model.JudgeInfo;
 import com.pani.oj.model.enums.JudgeInfoMessageEnum;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * @author Pani
@@ -13,27 +14,30 @@ import java.util.List;
  * @description
  */
 public class JavaLangJudgeStrategy implements JudgeStrategy {
+    private final long JAVA_PROGRAM_TIME_COST = 10000L;
     @Override
     public JudgeInfo doJudge(JudgeContext judgeContext) {
         //根据语言不同。判题标准应该不一样 ---> 策略模式
         JudgeInfo judgeInfo = new JudgeInfo();
 
-
         //4.1 是否超时 超空间
         JudgeInfo exeJudgeInfo = judgeContext.getJudgeInfo();
-        Long executeMemory = exeJudgeInfo.getMemory();
-        Long executeTime = exeJudgeInfo.getTime();
+        Long executeMemory = Optional.ofNullable(exeJudgeInfo.getMemory()).orElse(0L);
+        Long executeTime = Optional.ofNullable(exeJudgeInfo.getTime()).orElse(0L);
+        judgeInfo.setTime(executeTime);
+        judgeInfo.setMemory(executeMemory);
+
         JudgeConfig judgeConfig = judgeContext.getJudgeConfig();
         Long timeLimit = judgeConfig.getTimeLimit();
         Long memoryLimit = judgeConfig.getMemoryLimit();
-        //        Long stackLimit = judgeConfig.getStackLimit();
-        if (executeMemory > memoryLimit) {
+//                Long stackLimit = judgeConfig.getStackLimit();
+        if (executeMemory!=0L && executeMemory > memoryLimit) {
             judgeInfo.setMessage(JudgeInfoMessageEnum.MEMORY_LIMIT_EXCEEDED.getValue());
             return judgeInfo;
         }
         // Java 程序本身需要额外执行 10 秒钟
-        long JAVA_PROGRAM_TIME_COST = 10000L;
-        if ((timeLimit - JAVA_PROGRAM_TIME_COST) > executeTime) {
+
+        if (memoryLimit!=0L && (timeLimit - JAVA_PROGRAM_TIME_COST) > executeTime) {
             judgeInfo.setMessage(JudgeInfoMessageEnum.TIME_LIMIT_EXCEEDED.getValue());
             return judgeInfo;
         }

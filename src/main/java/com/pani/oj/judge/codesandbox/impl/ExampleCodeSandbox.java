@@ -3,13 +3,9 @@ package com.pani.oj.judge.codesandbox.impl;
 import com.pani.oj.judge.codesandbox.CodeSandbox;
 import com.pani.oj.judge.codesandbox.model.ExecuteCodeRequest;
 import com.pani.oj.judge.codesandbox.model.ExecuteCodeResponse;
-import com.pani.oj.model.dto.questionsubmit.JudgeInfo;
+import com.pani.oj.judge.codesandbox.model.JudgeInfo;
 import com.pani.oj.model.enums.JudgeInfoMessageEnum;
 import com.pani.oj.model.enums.QuestionSubmitStatusEnum;
-import com.sun.org.apache.xerces.internal.xs.LSInputList;
-import org.springframework.web.servlet.tags.form.InputTag;
-
-import java.util.List;
 
 /**
  * @author Pani

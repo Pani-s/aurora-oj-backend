@@ -2,14 +2,12 @@ package com.pani.oj.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.pani.oj.common.BaseResponse;
 import com.pani.oj.model.dto.question.QuestionEditRequest;
 import com.pani.oj.model.dto.question.QuestionQueryRequest;
 import com.pani.oj.model.dto.question.QuestionUpdateRequest;
 import com.pani.oj.model.entity.Question;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.pani.oj.model.vo.QuestionVO;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -46,13 +44,21 @@ public interface QuestionService extends IService<Question> {
     //todo getQuestionVO ---HttpServletRequest
 
     /**
-     * 分页获取帖子封装
+     * 分页获取题目封装
      *
      * @param questionPage
      * @param request
      * @return
      */
-    Page<QuestionVO> getQuestionVOPage(Page<Question> questionPage, HttpServletRequest request);
+    Page<QuestionVO> getMyQuestionVOPage(Page<Question> questionPage, HttpServletRequest request);
+
+
+    /**
+     * 获取题目
+     * @param questionPage
+     * @return
+     */
+    Page<QuestionVO> getQuestionVOPage(Page<Question> questionPage);
 
     /**
      * 编辑题目的信息（普通用户自己）

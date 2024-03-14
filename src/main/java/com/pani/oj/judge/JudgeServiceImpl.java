@@ -11,13 +11,14 @@ import com.pani.oj.judge.codesandbox.model.ExecuteCodeResponse;
 import com.pani.oj.judge.strategy.JudgeContext;
 import com.pani.oj.model.dto.question.JudgeCase;
 import com.pani.oj.model.dto.question.JudgeConfig;
-import com.pani.oj.model.dto.questionsubmit.JudgeInfo;
+import com.pani.oj.judge.codesandbox.model.JudgeInfo;
 import com.pani.oj.model.entity.Question;
 import com.pani.oj.model.entity.QuestionSubmit;
 import com.pani.oj.model.enums.QuestionSubmitStatusEnum;
 import com.pani.oj.service.QuestionService;
 import com.pani.oj.service.QuestionSubmitService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.stream.Collectors;
  * @date Created in 2024/3/8 20:42
  * @description
  */
+@Service
 public class JudgeServiceImpl implements JudgeService {
     @Value("${codeSandbox.type:example}")
     private String type;
@@ -79,31 +81,44 @@ public class JudgeServiceImpl implements JudgeService {
         if (!b) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "更新题目提交状态失败！");
         }
+
+        //3 调用沙箱，获取到执行结果
         ExecuteCodeRequest request = ExecuteCodeRequest.builder().
                 code(code).
                 language(language).
                 inputList(inputList).
                 build();
-
-        //3 调用沙箱，获取到执行结果
         CodeSandbox codeSandbox = CodeSandboxFactory.getInstance(type);
         ExecuteCodeResponse executeCodeResponse = new CodeSandboxProxy(codeSandbox).
                 executeCode(request);
 
 
         //4 根据沙箱的执行结果，设置题目的判题状态和信息
+        Integer resStatus = executeCodeResponse.getStatus();
+        if(!resStatus.equals(0)){
+            //说明没有正常退出
+            questionSubmit = new QuestionSubmit();
+            questionSubmit.setId(questionSubmitId);
+            questionSubmit.setStatus(QuestionSubmitStatusEnum.FAILED.getValue());
+            questionSubmit.setJudgeInfo(JSONUtil.toJsonStr(executeCodeResponse.getJudgeInfo()));
+            b = questionSubmitService.updateById(questionSubmit);
+            if (!b) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "题目状态更新错误");
+            }
+            QuestionSubmit questionSubmitResult = questionSubmitService.getById(questionId);
+            return questionSubmitResult;
+        }
         //根据语言不同。判题标准应该不一样 ---> 策略模式
-        JudgeInfo judgeInfo = new JudgeInfo();
+//        JudgeInfo judgeInfo = new JudgeInfo();
 
-        //4.1 是否超时 超空间
         JudgeConfig judgeConfig = JSONUtil.toBean(question.getJudgeConfig(), JudgeConfig.class);
         JudgeContext judgeContext = new JudgeContext();
         judgeContext.setJudgeInfo(executeCodeResponse.getJudgeInfo());
         judgeContext.setOutputList(executeCodeResponse.getOutputList());
         judgeContext.setJudgeCaseList(judgeCaseList);
         judgeContext.setJudgeConfig(judgeConfig);
-        judgeContext.setQuestionSubmit(questionSubmit);
-
+        judgeContext.setLanguage(questionSubmit.getLanguage());
+        //策略模式
         JudgeInfo judgeInfoRes = judgeManager.doJudge(judgeContext);
 
         // 5）修改数据库中的判题结果
@@ -117,17 +132,6 @@ public class JudgeServiceImpl implements JudgeService {
         }
         QuestionSubmit questionSubmitResult = questionSubmitService.getById(questionId);
         return questionSubmitResult;
-
-
     }
 
-    //    /**
-    //     * doJudge方法体中 代码太多，抽取前面为单独方法
-    //     *
-    //     * @return
-    //     */
-    //    private ExecuteCodeRequest buildExecuteRequest(long questionSubmitId) {
-    //
-    //        return request;
-    //    }
 }

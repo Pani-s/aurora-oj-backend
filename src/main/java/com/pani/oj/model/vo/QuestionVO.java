@@ -2,9 +2,7 @@ package com.pani.oj.model.vo;
 
 import cn.hutool.json.JSONUtil;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.google.gson.reflect.TypeToken;
 import com.pani.oj.model.dto.question.JudgeConfig;
-import com.pani.oj.model.entity.Post;
 import com.pani.oj.model.entity.Question;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;

@@ -2,7 +2,7 @@ package com.pani.oj.judge.strategy;
 
 import com.pani.oj.model.dto.question.JudgeCase;
 import com.pani.oj.model.dto.question.JudgeConfig;
-import com.pani.oj.model.dto.questionsubmit.JudgeInfo;
+import com.pani.oj.judge.codesandbox.model.JudgeInfo;
 import com.pani.oj.model.entity.QuestionSubmit;
 import lombok.Data;
 
@@ -41,6 +41,10 @@ public class JudgeContext {
      */
     private JudgeConfig judgeConfig;
 
-    private QuestionSubmit questionSubmit;
+//    private QuestionSubmit questionSubmit;
 
+    /**
+     * 使用语言
+     */
+    private String language;
 }

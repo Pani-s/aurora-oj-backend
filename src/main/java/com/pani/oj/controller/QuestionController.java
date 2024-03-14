@@ -11,10 +11,15 @@ import com.pani.oj.constant.UserConstant;
 import com.pani.oj.exception.BusinessException;
 import com.pani.oj.exception.ThrowUtils;
 import com.pani.oj.model.dto.question.*;
+import com.pani.oj.model.dto.questionsubmit.QuestionSubmitAddRequest;
+import com.pani.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.pani.oj.model.entity.Question;
+import com.pani.oj.model.entity.QuestionSubmit;
 import com.pani.oj.model.entity.User;
+import com.pani.oj.model.vo.QuestionSubmitVO;
 import com.pani.oj.model.vo.QuestionVO;
 import com.pani.oj.service.QuestionService;
+import com.pani.oj.service.QuestionSubmitService;
 import com.pani.oj.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -25,9 +30,11 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**
- * 帖子接口
+ * 题目接口
  *
  * @author pani
+ *
+ * getmapping遇到很多坑，还是回来用postmapping吧
  * 
  */
 @RestController
@@ -40,6 +47,9 @@ public class QuestionController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private QuestionSubmitService questionSubmitService;
 
     //准备都用Hutool了
 //    private final static Gson GSON = new Gson();
@@ -182,11 +192,11 @@ public class QuestionController {
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         Page<Question> questionPage = questionService.page(new Page<>(current, size),
                 questionService.getQueryWrapper(questionQueryRequest));
-        return ResultUtils.success(questionService.getQuestionVOPage(questionPage, request));
+        return ResultUtils.success(questionService.getQuestionVOPage(questionPage));
     }
 
     /**
-     * 分页获取当前用户创建的资源列表
+     * 分页获取当前用户创建的问题列表
      *
      * @param questionQueryRequest
      * @param request
@@ -206,7 +216,7 @@ public class QuestionController {
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         Page<Question> questionPage = questionService.page(new Page<>(current, size),
                 questionService.getQueryWrapper(questionQueryRequest));
-        return ResultUtils.success(questionService.getQuestionVOPage(questionPage, request));
+        return ResultUtils.success(questionService.getMyQuestionVOPage(questionPage, request));
     }
 
     /**
@@ -248,5 +258,91 @@ public class QuestionController {
     }
 
     // endregion
+    //region 题目提交
+    /**
+     * 提交题目
+     * @return id
+     */
+    @PostMapping("/submit/do")
+    public BaseResponse<Long> doQuestionSubmit(@RequestBody QuestionSubmitAddRequest questionSubmitAddRequest,
+                                               HttpServletRequest request) {
+        if (questionSubmitAddRequest == null || questionSubmitAddRequest.getQuestionId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 登录才能操作
+        final User loginUser = userService.getLoginUser(request);
+        long questionSubmitId = questionSubmitService.doQuestionSubmit(questionSubmitAddRequest, loginUser);
+        return ResultUtils.success(questionSubmitId);
+    }
 
+    /**
+     * 分页获取题目提交列表（除了管理员外，普通用户只能看到非答案、提交代码等公开信息）
+     * 该题目的提交列表---可以看代码，目前不能看提交用户名，我觉得还是匿名吧
+     * @param questionSubmitQueryRequest
+     * @param request
+     */
+    @PostMapping("/submit/list/page")
+    public BaseResponse<Page<QuestionSubmitVO>> listSubmitQuestionByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
+                                                                         HttpServletRequest request) {
+        if (questionSubmitQueryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        long current = questionSubmitQueryRequest.getCurrent();
+        long size = questionSubmitQueryRequest.getPageSize();
+        // 从数据库中查询原始的题目提交分页信息
+        Page<QuestionSubmit> questionSubmitPage = questionSubmitService.page(new Page<>(current, size),
+                questionSubmitService.getQueryWrapper(questionSubmitQueryRequest));
+        final User loginUser = userService.getLoginUser(request);
+        // 返回脱敏信息
+        return ResultUtils.success(questionSubmitService.getQuestionSubmitVOPage(questionSubmitPage, loginUser));
+    }
+
+    /**
+     * 获取本人提交的题目
+     * @param questionSubmitQueryRequest
+     * @param request
+     */
+    @PostMapping("/submit/list/my/page")
+    public BaseResponse<Page<QuestionSubmit>> listMySubmitQuestionByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
+                                                                         HttpServletRequest request) {
+        if (questionSubmitQueryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        if(!loginUser.getId().equals(questionSubmitQueryRequest.getUserId())){
+            //不是查询的本人
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+
+        long current = questionSubmitQueryRequest.getCurrent();
+        long size = questionSubmitQueryRequest.getPageSize();
+        // 从数据库中查询原始的题目提交分页信息
+        Page<QuestionSubmit> questionSubmitPage = questionSubmitService.page(new Page<>(current, size),
+                questionSubmitService.getQueryWrapper(questionSubmitQueryRequest));
+        // 返回脱敏信息
+        return ResultUtils.success(questionSubmitPage);
+    }
+
+
+    /**
+     * 所有人的所有题目提交记录，按照时间排序(【【公屏】】，所以只能看到【提交用户id（甚至匿名） 语言)
+     * @param questionSubmitQueryRequest
+     * @param request
+     */
+    @PostMapping("/submit/list/all/page")
+    public BaseResponse<Page<QuestionSubmit>> listAllSubmitQuestionByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
+                                                                          HttpServletRequest request) {
+        if (questionSubmitQueryRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        long current = questionSubmitQueryRequest.getCurrent();
+        long size = questionSubmitQueryRequest.getPageSize();
+        // 从数据库中查询原始的题目提交分页信息
+        Page<QuestionSubmit> questionSubmitPage = questionSubmitService.page(new Page<>(current, size),
+                questionSubmitService.getQueryWrapper(questionSubmitQueryRequest));
+        //提交代码不给看了
+        questionSubmitPage.getRecords().forEach((o) -> o.setCode(null));
+        return ResultUtils.success(questionSubmitPage);
+    }
+    //endregion
 }

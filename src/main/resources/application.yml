@@ -20,7 +20,7 @@ spring:
   # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${pani.mysql.host}:3306/${pani.mysql.dbname}?useUnicode=true&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${pani.mysql.host}:3306/${pani.mysql.dbname}?useUnicode=true&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
     username: ${pani.mysql.user:root}
     password: ${pani.mysql.pwd}
   # Redis 配置
@@ -90,5 +90,6 @@ yuapi:
     access-key: ${pani.ai.yuapi.access-key}
     secret-key: ${pani.ai.yuapi.secret-key}
 
+# 代码沙箱 类型配置
 codeSandbox:
   type: remote

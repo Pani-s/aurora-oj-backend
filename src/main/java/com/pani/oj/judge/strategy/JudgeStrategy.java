@@ -1,6 +1,6 @@
 package com.pani.oj.judge.strategy;
 
-import com.pani.oj.model.dto.questionsubmit.JudgeInfo;
+import com.pani.oj.judge.codesandbox.model.JudgeInfo;
 
 /**
  * @author Pani

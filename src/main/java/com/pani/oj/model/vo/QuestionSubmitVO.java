@@ -2,7 +2,7 @@ package com.pani.oj.model.vo;
 
 import cn.hutool.json.JSONUtil;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.pani.oj.model.dto.questionsubmit.JudgeInfo;
+import com.pani.oj.judge.codesandbox.model.JudgeInfo;
 import com.pani.oj.model.entity.QuestionSubmit;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;
@@ -64,14 +64,14 @@ public class QuestionSubmitVO {
     private Date updateTime;
     
     /**
-     * 创建题目人的信息
+     * 该提交记录对应用户人的信息
      */
     private UserVO userVO;
 
-    /**
-     * 对应题目信息
-     */
-    private QuestionVO questionVO;
+//    /**
+//     * 对应题目信息
+//     */
+//    private QuestionVO questionVO;
 
     private static final long serialVersionUID = 1L;
 
