@@ -124,7 +124,7 @@ public class JudgeServiceImpl implements JudgeService {
         // 5）修改数据库中的判题结果
         questionSubmit = new QuestionSubmit();
         questionSubmit.setId(questionSubmitId);
-        questionSubmit.setStatus(QuestionSubmitStatusEnum.SUCCEED.getValue());
+        questionSubmit.setStatus(QuestionSubmitStatusEnum.FINISHED.getValue());
         questionSubmit.setJudgeInfo(JSONUtil.toJsonStr(judgeInfoRes));
         b = questionSubmitService.updateById(questionSubmit);
         if (!b) {

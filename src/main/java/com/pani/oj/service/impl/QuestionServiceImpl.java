@@ -4,27 +4,27 @@ import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.pani.oj.common.BaseResponse;
 import com.pani.oj.common.ErrorCode;
-import com.pani.oj.common.ResultUtils;
 import com.pani.oj.constant.CommonConstant;
 import com.pani.oj.exception.BusinessException;
 import com.pani.oj.exception.ThrowUtils;
 import com.pani.oj.mapper.QuestionMapper;
 import com.pani.oj.model.dto.question.*;
 import com.pani.oj.model.entity.Question;
+import com.pani.oj.model.entity.QuestionSubmit;
 import com.pani.oj.model.entity.User;
 import com.pani.oj.model.vo.QuestionVO;
 import com.pani.oj.model.vo.UserVO;
 import com.pani.oj.service.QuestionService;
+import com.pani.oj.service.QuestionSubmitService;
 import com.pani.oj.service.UserService;
 import com.pani.oj.utils.SqlUtils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -43,6 +43,10 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
         implements QuestionService {
     @Resource
     private UserService userService;
+
+    @Resource
+    @Lazy
+    private QuestionSubmitService questionSubmitService;
 
     private final int TITLE_LENGTH_LIMIT = 80;
     private final int CONTENT_LENGTH_LIMIT = 8192;
@@ -255,6 +259,32 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
             throw new BusinessException(ErrorCode.OPERATION_ERROR);
         }
         return result;
+    }
+
+    @Override
+    public Question getQuestionAnswerById(long questionId, HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        if(loginUser == null){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        //查询用户是否提交过该题
+        Long userId = loginUser.getId();
+        QueryWrapper<QuestionSubmit> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("userId",userId).eq("questionId",questionId);
+        long count = questionSubmitService.count(queryWrapper);
+        if(count == 0){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR,"未提交过该题！");
+        }
+        //返回答案
+
+        QueryWrapper<Question> questionQueryWrapper = new QueryWrapper<>();
+        questionQueryWrapper.eq("id",questionId);
+        questionQueryWrapper.select("id","answer");
+        Question question = this.getOne(questionQueryWrapper);
+        if(question == null){
+            throw new BusinessException(ErrorCode.OPERATION_ERROR);
+        }
+        return question;
     }
     //endregion
 

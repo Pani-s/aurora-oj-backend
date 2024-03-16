@@ -74,4 +74,12 @@ public interface QuestionService extends IService<Question> {
      * @return 成功失败
      */
     Boolean updateQuestion(QuestionUpdateRequest questionUpdateRequest);
+
+    /**
+     * 返回题目答案
+     * @param id
+     * @param request
+     * @return
+     */
+    Question getQuestionAnswerById(long id, HttpServletRequest request);
 }

@@ -19,7 +19,7 @@ public enum QuestionSubmitStatusEnum {
      */
     WAITING("等待中", 0),
     RUNNING("判题中", 1),
-    SUCCEED("成功", 2),
+    FINISHED("正常退出", 2),
     FAILED("失败", 3);
 
     private final String text;

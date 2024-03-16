@@ -42,6 +42,7 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         implements QuestionSubmitService {
 
     @Resource
+    @Lazy
     private QuestionService questionService;
 
     @Resource

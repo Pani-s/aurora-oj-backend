@@ -177,6 +177,20 @@ public class QuestionController {
     }
 
     /**
+     * 根据 id 获取 答案，前提是这个用户做过
+     *
+     * @param id
+     * @return
+     */
+    @GetMapping("/get/answer")
+    public BaseResponse<Question> getQuestionAnswerById(long id, HttpServletRequest request) {
+        if (id <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        return ResultUtils.success(questionService.getQuestionAnswerById(id,request));
+    }
+
+    /**
      * 分页获取列表（封装类）
      *
      * @param questionQueryRequest
