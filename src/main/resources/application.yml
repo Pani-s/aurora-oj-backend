@@ -24,17 +24,17 @@ spring:
     username: ${pani.mysql.user:root}
     password: ${pani.mysql.pwd}
     # Redis 配置
-    redis:
-      database: 1
-      host: ${pani.redis.host}
-      port: 6379
-      timeout: 5000
-  # rabbitmq 配置
-    rabbitmq:
-      host: ${pani.rabbitmq.host}
-      port: 5672
-      username: ${pani.rabbitmq.username}
-      password: ${pani.rabbitmq.pwd}
+  redis:
+    database: 1
+    host: ${pani.redis.host}
+    port: 6379
+    timeout: 5000
+    # rabbitmq 配置
+  rabbitmq:
+    host: ${pani.rabbitmq.host}
+    port: 5672
+    username: ${pani.rabbitmq.username}
+    password: ${pani.rabbitmq.pwd}
   # Elasticsearch 配置
   #  elasticsearch:
   #    uris: http://${pani.es.uris-host}:9200

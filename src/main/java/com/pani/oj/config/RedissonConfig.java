@@ -14,7 +14,6 @@ import org.springframework.context.annotation.Configuration;
  * @date Created in 2023/11/19 23:03
  * @description 从application.yml文件中读取前缀为"spring.redis"的配置项
  */
-//todo: 记得去pom里取消 Redisson 注释，还有下面的
 @Configuration
 @ConfigurationProperties(prefix = "spring.redis")
 @Data

@@ -1,12 +1,11 @@
 package com.pani.oj.judge.codesandbox;
 
 import com.pani.oj.judge.codesandbox.impl.ExampleCodeSandbox;
-import com.pani.oj.judge.codesandbox.model.ExecuteCodeRequest;
-import com.pani.oj.judge.codesandbox.model.ExecuteCodeResponse;
 import com.pani.oj.model.enums.QuestionSubmitLanguageEnum;
+import com.pani.oj.model.sandbox.ExecuteCodeRequest;
+import com.pani.oj.model.sandbox.ExecuteCodeResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.shadow.com.univocity.parsers.annotations.Validate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -14,8 +13,6 @@ import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * @author Pani
@@ -26,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class CodeSandboxTest {
     @Value("${codeSandbox.type:example}")
     private  String type;
+
+    @Resource
+    private CodeSandboxFactory codeSandboxFactory;
 
     @Test
     void testSandBox(){
@@ -41,7 +41,7 @@ class CodeSandboxTest {
 
     @Test
     void testFactory() {
-        CodeSandbox codeSandbox = CodeSandboxFactory.getInstance(type);
+        CodeSandbox codeSandbox = codeSandboxFactory.getInstanceWithType(type);
         ExecuteCodeRequest request = ExecuteCodeRequest.builder().
                 code("hello world").
                 language(QuestionSubmitLanguageEnum.JAVA.getValue()).
@@ -52,7 +52,7 @@ class CodeSandboxTest {
 
     @Test
     void testProxy(){
-        CodeSandbox codeSandbox = CodeSandboxFactory.getInstance(type);
+        CodeSandbox codeSandbox = codeSandboxFactory.getInstanceWithType(type);
         ExecuteCodeRequest request = ExecuteCodeRequest.builder().
                 code("hello world").
                 language(QuestionSubmitLanguageEnum.JAVA.getValue()).
@@ -63,7 +63,7 @@ class CodeSandboxTest {
 
     @Test
     void executeCodeByProxy() {
-        CodeSandbox codeSandbox = CodeSandboxFactory.getInstance(type);
+        CodeSandbox codeSandbox = codeSandboxFactory.getInstanceWithType(type);
         codeSandbox = new CodeSandboxProxy(codeSandbox);
         String code = "public class Main {\n" +
                 "    public static void main(String[] args) {\n" +
