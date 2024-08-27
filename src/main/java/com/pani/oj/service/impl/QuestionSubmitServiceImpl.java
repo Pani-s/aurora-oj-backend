@@ -1,13 +1,19 @@
 package com.pani.oj.service.impl;
 
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+
 import com.pani.oj.common.ErrorCode;
 import com.pani.oj.constant.CommonConstant;
+import com.pani.oj.constant.JudgeConstant;
 import com.pani.oj.exception.BusinessException;
+import com.pani.oj.exception.ThrowUtils;
 import com.pani.oj.judge.JudgeService;
 import com.pani.oj.mapper.QuestionSubmitMapper;
+import com.pani.oj.model.dto.questionsubmit.QuestionDebugRequest;
 import com.pani.oj.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.pani.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.pani.oj.model.entity.Question;
@@ -15,17 +21,22 @@ import com.pani.oj.model.entity.QuestionSubmit;
 import com.pani.oj.model.entity.User;
 import com.pani.oj.model.enums.QuestionSubmitLanguageEnum;
 import com.pani.oj.model.enums.QuestionSubmitStatusEnum;
+import com.pani.oj.model.vo.QuestionDebugResponse;
 import com.pani.oj.model.vo.QuestionSubmitVO;
+import com.pani.oj.mq.rabbitmq.JudgeMessageProducer;
 import com.pani.oj.service.QuestionService;
 import com.pani.oj.service.QuestionSubmitService;
 import com.pani.oj.service.UserService;
 import com.pani.oj.utils.SqlUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +48,7 @@ import java.util.stream.Collectors;
  * @description 针对表【question_submit(题目提交)】的数据库操作Service实现
  * @createDate 2024-03-06 12:30:40
  */
+@Slf4j
 @Service
 public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper, QuestionSubmit>
         implements QuestionSubmitService {
@@ -48,16 +60,15 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     @Resource
     private UserService userService;
 
-    /*
-    todo: 有循环依赖 加了@Lazy 还是想个办法解决一下
-    https://blog.csdn.net/WX10301075WX/article/details/123904543
-     */
-
     @Resource
     @Lazy
     private JudgeService judgeService;
 
+    @Resource
+    private JudgeMessageProducer judgeMessageProducer;
 
+
+    @Transactional(rollbackFor = RuntimeException.class)
     @Override
     public long doQuestionSubmit(QuestionSubmitAddRequest questionSubmitAddRequest, User loginUser) {
         // 校验编程语言是否合法
@@ -66,36 +77,72 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         if (languageEnum == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "编程语言错误");
         }
+        //校检长度
+        int length = questionSubmitAddRequest.getCode().length();
+        if(length > JudgeConstant.MAX_CODE_LEN){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户提交代码长度超出限制");
+        }
+
         long questionId = questionSubmitAddRequest.getQuestionId();
         // 判断实体是否存在，根据类别获取实体
         Question question = questionService.getById(questionId);
         if (question == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR,"对应的题目不存在");
         }
-        // 是否已提交题目
+
         long userId = loginUser.getId();
-        // 每个用户【串行】提交题目 手动防止连点是叭
         QuestionSubmit questionSubmit = new QuestionSubmit();
         questionSubmit.setUserId(userId);
         questionSubmit.setQuestionId(questionId);
         questionSubmit.setCode(questionSubmitAddRequest.getCode());
         questionSubmit.setLanguage(language);
-        // 设置初始状态
+        // 设置初始状态，等待判题中
         questionSubmit.setStatus(QuestionSubmitStatusEnum.WAITING.getValue());
         questionSubmit.setJudgeInfo("{}");
         boolean save = this.save(questionSubmit);
         if (!save) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "数据插入失败");
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "题目提交数据插入失败");
         }
         Long questionSubmitId = questionSubmit.getId();
+        log.info("题目提交信息初始化完成并存入数据库:{}",questionSubmit);
 
-        //异步执行判题服务
+        //题目提交数+1
         CompletableFuture.runAsync(() -> {
-            System.out.println("执行判题服务");
-            judgeService.doJudge(questionSubmitId);
+            UpdateWrapper<Question> questionUpdateWrapper = new UpdateWrapper<>();
+            questionUpdateWrapper.eq("id",questionId);
+            questionUpdateWrapper.setSql("submitNum = submitNum + 1");
+            boolean update = questionService.update(questionUpdateWrapper);
+            if(!update){
+                log.error("数据库 - 题目提交数+1 失败：{}",questionId);
+            }
         });
 
+
+        //消息队列
+        log.info("题目提交信息发送至消息队列，id是:{}",questionSubmitId);
+        judgeMessageProducer.sendMessage(String.valueOf(questionSubmitId));
+
+        //异步执行判题服务
+        //        CompletableFuture.runAsync(() -> {
+        //            System.out.println("执行判题服务");
+        //            judgeFeignClient.doJudge(questionSubmitId);
+        //        });
+
         return questionSubmitId;
+    }
+
+    @Override
+    public QuestionDebugResponse doQuestionDebug(QuestionDebugRequest questionDebugRequest) {
+        int length = questionDebugRequest.getCode().length();
+        if(length > JudgeConstant.MAX_CODE_LEN){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户提交代码长度超出限制");
+        }
+        QuestionDebugResponse questionDebugResponse = judgeService.doDebug(questionDebugRequest);
+        //todo : 解决一下远程调用后抛出的异常怎么接的问题。。
+        if(questionDebugResponse.getJudgeInfo() == null){
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+        }
+        return questionDebugResponse;
     }
 
     @Override
@@ -108,7 +155,7 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         Long questionId = questionSubmitQueryRequest.getQuestionId();
         Integer status = questionSubmitQueryRequest.getStatus();
         Long userId = questionSubmitQueryRequest.getUserId();
-//        String sortField = questionSubmitQueryRequest.getSortField();
+        //        String sortField = questionSubmitQueryRequest.getSortField();
         String sortField = "updateTime";
         String sortOrder = questionSubmitQueryRequest.getSortOrder();
 
@@ -127,7 +174,8 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     @Override
     public QuestionSubmitVO getQuestionSubmitVO(QuestionSubmit questionSubmit, User loginUser) {
         QuestionSubmitVO questionSubmitVO = QuestionSubmitVO.objToVo(questionSubmit);
-        // 脱敏：仅【本人和管理员】能看见自己（提交 userId 和登录用户 id 不同）提交的代码 todo：现在感觉又可以看，不过这个方法目前没人用
+        // 脱敏：仅【本人和管理员】能看见自己（提交 userId 和登录用户 id 不同）提交的代码
+        // todo：现在感觉又可以看，不过这个方法目前没人用
         // 1. 关联查询用户信息
         Long userId1 = loginUser.getId();
         if (!userId1.equals(questionSubmit.getUserId()) && !userService.isAdmin(loginUser)) {
@@ -158,32 +206,69 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
          */
         // 关联查询用户信息
         Set<Long> userIdSet = questionSubmitList.stream().map(QuestionSubmit::getUserId).collect(Collectors.toSet());
-//        Set<Long> questionIdSet = questionSubmitList.stream().map(QuestionSubmit::getQuestionId).collect(Collectors.toSet());
         Map<Long, List<User>> userIdUserListMap = userService.listByIds(userIdSet).stream()
                 .collect(Collectors.groupingBy(User::getId));
-//        Map<Long, List<Question>> questionIdUserListMap = questionService.listByIds(questionIdSet).stream()
-//                .collect(Collectors.groupingBy(Question::getId));
 
         // 填充信息
         List<QuestionSubmitVO> questionSubmitVOList = questionSubmitList.stream().map(questionSubmit -> {
             QuestionSubmitVO questionSubmitVO = QuestionSubmitVO.objToVo(questionSubmit);
             Long userId = questionSubmit.getUserId();
-//            Long questionId = questionSubmit.getQuestionId();
             User user = null;
             if (userIdUserListMap.containsKey(userId)) {
                 user = userIdUserListMap.get(userId).get(0);
             }
-//            Question question = null;
-//            if (questionIdUserListMap.containsKey(questionId)) {
-//                question = questionIdUserListMap.get(questionId).get(0);
-//            }
             questionSubmitVO.setUserVO(userService.getUserVO(user));
-//            questionSubmitVO.setQuestionVO(questionService.getQuestionVO(question));
             return questionSubmitVO;
         }).collect(Collectors.toList());
 
         questionVOPage.setRecords(questionSubmitVOList);
         return questionVOPage;
+    }
+
+    @Override
+    public boolean setQuestionSubmitFailure(long questionSubmitId) {
+        QuestionSubmit questionSubmit = new QuestionSubmit();
+        questionSubmit.setId(questionSubmitId);
+        questionSubmit.setStatus(QuestionSubmitStatusEnum.FAILED.getValue());
+        return this.updateById(questionSubmit);
+    }
+
+    @Override
+    public void checkErrorQuestion(long questionSubmitId, HttpServletRequest request){
+        //检查用户在不在
+        User loginUser = userService.getLoginUser(request);
+        ThrowUtils.throwIf(loginUser == null , ErrorCode.NOT_LOGIN_ERROR);
+        //查找questionSubmit
+        QuestionSubmit questionSubmit = this.getById(questionSubmitId);
+        ThrowUtils.throwIf(questionSubmit == null , ErrorCode.NOT_FOUND_ERROR,"题目提交信息不存在");
+        if(!questionSubmit.getUserId().equals(loginUser.getId())){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR,"该题目提交信息不属于该用户！");
+        }
+        if(!questionSubmit.getStatus().equals(QuestionSubmitStatusEnum.ERROR.getValue())){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"该题目提交信息非ERROR状态");
+        }
+    }
+
+    @Override
+    public boolean retryMyErrorSubmit(long questionSubmitId, HttpServletRequest request) {
+        checkErrorQuestion(questionSubmitId,request);
+        //消息队列
+        log.info("Retry - 题目提交信息发送至消息队列，id是:{}",questionSubmitId);
+        judgeMessageProducer.sendMessage(String.valueOf(questionSubmitId));
+        return true;
+    }
+
+    @Override
+    public QuestionSubmit getQuestionSubmitById(long questionSubmitId) {
+        log.info("getQuestionSubmitById：{}",questionSubmitId);
+        QuestionSubmit questionSubmit = this.getById(questionSubmitId);
+        if(questionSubmit == null){
+            log.info("查到空，悲伤，questionSubmit为null，手动再试一下");
+            //手动再试一下
+            questionSubmit = this.getById(questionSubmitId);
+        }
+        log.info("之后questionSubmit：{}",questionSubmit);
+        return questionSubmit;
     }
 }
 

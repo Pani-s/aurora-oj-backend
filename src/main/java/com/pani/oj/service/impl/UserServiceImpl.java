@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.pani.oj.constant.CommonConstant;
 import com.pani.oj.constant.UserConstant;
 import com.pani.oj.exception.BusinessException;
+import com.pani.oj.exception.ThrowUtils;
+import com.pani.oj.model.dto.user.UserPwdUpdateMyRequest;
 import com.pani.oj.model.vo.LoginUserVO;
 import com.pani.oj.service.UserService;
 import com.pani.oj.common.ErrorCode;
@@ -46,12 +48,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
         }
-        if (userAccount.length() < UserConstant.ACCOUNT_LEN_SHORTEST) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户账号过短");
+        if (userAccount.length() < UserConstant.ACCOUNT_LEN_SHORTEST || userAccount.length() > UserConstant.ACCOUNT_LEN_MAX) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户账号长度不符合规定");
         }
-        if (userPassword.length() < UserConstant.PWD_LEN_SHORTEST ||
-                checkPassword.length() < UserConstant.PWD_LEN_SHORTEST) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码过短");
+        if (userPassword.length() < UserConstant.PWD_LEN_SHORTEST || userPassword.length() > UserConstant.PWD_LEN_MAX) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户密码长度不符合规定");
         }
         // 密码和校验密码相同
         if (!userPassword.equals(checkPassword)) {
@@ -146,9 +147,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (currentUser == null || currentUser.getId() == null) {
             return null;
         }
+        return currentUser;
         // 从数据库查询（追求性能的话可以注释，直接走缓存）
-        long userId = currentUser.getId();
-        return this.getById(userId);
+//        long userId = currentUser.getId();
+//        return this.getById(userId);
     }
 
     /**
@@ -232,5 +234,57 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         queryWrapper.orderBy(SqlUtils.validSortField(sortField), sortOrder.equals(CommonConstant.SORT_ORDER_ASC),
                 sortField);
         return queryWrapper;
+    }
+
+    @Override
+    public boolean resetPassword(Long userId) {
+        User user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "该用户不存在！");
+        }
+        //重置成123456
+        String encryptPassword = DigestUtils.md5DigestAsHex((SALT + "123456").getBytes());
+
+        user.setUserPassword(encryptPassword);
+        boolean update = this.updateById(user);
+        if (!update) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "重置密码失败，数据库错误");
+        }
+        return true;
+
+    }
+
+    @Override
+    public boolean changePwd(UserPwdUpdateMyRequest userPwdUpdateMyRequest, HttpServletRequest request) {
+        String userPassword = userPwdUpdateMyRequest.getUserPassword();
+        String newPassword = userPwdUpdateMyRequest.getNewPassword();
+        String checkedNewPassword = userPwdUpdateMyRequest.getCheckedNewPassword();
+
+        //检查两次输入的密码是否一致
+        if (StringUtils.isAnyBlank(userPassword, newPassword, checkedNewPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
+        }
+        if (userPassword.length() < UserConstant.PWD_LEN_SHORTEST || newPassword.length() < UserConstant.PWD_LEN_SHORTEST ||
+                checkedNewPassword.length() < UserConstant.PWD_LEN_SHORTEST) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码长度错误或过短");
+        }
+        ThrowUtils.throwIf(!(newPassword.equals(checkedNewPassword)),
+                ErrorCode.PARAMS_ERROR, "两次新密码输入不一致");
+
+        //检查旧密码是否一致
+        User loginUser = this.getLoginUser(request);
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", loginUser.getId());
+        queryWrapper.select("id", "userPassword");
+        User user = this.getOne(queryWrapper);
+        String encryptOldPwd = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
+        ThrowUtils.throwIf(!(encryptOldPwd.equals(user.getUserPassword())),
+                ErrorCode.PARAMS_ERROR, "用户旧密码错误");
+        //终于可以开始改密码了
+        String encryptNewPwd = DigestUtils.md5DigestAsHex((SALT + newPassword).getBytes());
+        user.setUserPassword(encryptNewPwd);
+        this.updateById(user);
+        //用户退出应该是前端做
+        return true;
     }
 }

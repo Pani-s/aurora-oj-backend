@@ -1,13 +1,18 @@
 package com.pani.oj.service.impl;
 
+
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.pani.oj.common.ErrorCode;
 import com.pani.oj.constant.CommonConstant;
+import com.pani.oj.constant.RedisConstant;
 import com.pani.oj.exception.BusinessException;
 import com.pani.oj.exception.ThrowUtils;
+import com.pani.oj.manager.CacheClient;
 import com.pani.oj.mapper.QuestionMapper;
 import com.pani.oj.model.dto.question.*;
 import com.pani.oj.model.entity.Question;
@@ -18,6 +23,7 @@ import com.pani.oj.model.vo.UserVO;
 import com.pani.oj.service.QuestionService;
 import com.pani.oj.service.QuestionSubmitService;
 import com.pani.oj.service.UserService;
+import com.pani.oj.service.UserSubmitService;
 import com.pani.oj.utils.SqlUtils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -31,6 +37,7 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -42,12 +49,17 @@ import java.util.stream.Collectors;
 public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
         implements QuestionService {
     @Resource
+    private CacheClient cacheClient;
+    @Resource
     private UserService userService;
+    @Resource
+    private UserSubmitService userSubmitService;
 
     @Resource
     @Lazy
     private QuestionSubmitService questionSubmitService;
 
+    //todo
     private final int TITLE_LENGTH_LIMIT = 80;
     private final int CONTENT_LENGTH_LIMIT = 8192;
 
@@ -86,6 +98,106 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
         if (StringUtils.isNotBlank(judgeConfig) && judgeConfig.length() > CONTENT_LENGTH_LIMIT) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "判题配置过长");
         }
+    }
+
+    @Override
+    public Page<QuestionVO> listQuestionVOByPage(QuestionQueryRequest questionQueryRequest, HttpServletRequest request) {
+        long current = questionQueryRequest.getCurrent();
+        long size = questionQueryRequest.getPageSize();
+        ThrowUtils.throwIf(current < 0 || size < 0, ErrorCode.PARAMS_ERROR);
+        // 限制爬虫
+        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR, "请求参数过大");
+        User loginUser = userService.getLoginUserPermitNull(request);
+
+        //查询
+        Page<Question> questionPage = this.page(new Page<>(current, size),
+                this.getQueryWrapperWithoutContent(questionQueryRequest));
+        Page<QuestionVO> questionVOPage = this.getQuestionVOPage(questionPage, loginUser);
+        return questionVOPage;
+    }
+
+
+/*    @Override
+    public Page<QuestionVO> listQuestionVOByPage(QuestionQueryRequest questionQueryRequest, HttpServletRequest request) {
+        long current = questionQueryRequest.getCurrent();
+        long size = questionQueryRequest.getPageSize();
+        ThrowUtils.throwIf(current < 0 || size < 0, ErrorCode.PARAMS_ERROR);
+        // 限制爬虫
+        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR, "请求参数过大");
+        User loginUser = userFeignClient.getLoginUserMayNull(request);
+
+        //如果没有任何搜索词，就可以走缓存。
+        Long id = questionQueryRequest.getId();
+        String title = questionQueryRequest.getTitle();
+        String content = questionQueryRequest.getContent();
+        List<String> tags = questionQueryRequest.getTags();
+        if (id != null || !(StringUtils.isAllBlank(title, content)) || !(CollectionUtil.isEmpty(tags))) {
+            //id不为空，搜索词不全空，tags不空，则不能走缓存
+            Page<Question> questionPage = this.page(new Page<>(current, size),
+                    this.getQueryWrapperWithoutContent(questionQueryRequest));
+            return this.getQuestionVOPage(questionPage, loginUser);
+        }
+
+        String key = null;
+        //缓存里拿
+        if (loginUser == null) {
+            key = RedisConstant.CACHE_QUESTION_PAGE + current + "-" + size;
+            Page<QuestionVO> pageCache = cacheClient.getPageCache(key, QuestionVO.class);
+            if (pageCache != null) {
+                return pageCache;
+            }
+
+            Page<Question> questionPage = this.page(new Page<>(current, size),
+                    this.getQueryWrapperWithoutContent(questionQueryRequest));
+            Page<QuestionVO> questionVOPage = this.getQuestionVOPage(questionPage, null);
+            cacheClient.set(key, questionVOPage, RedisConstant.CACHE_QUESTION_PAGE_TTL, TimeUnit.MINUTES);
+            return questionVOPage;
+        }
+//        else {
+//            key = RedisConstant.CACHE_QUESTION_PAGE + current + "-" + size + "-" + loginUser.getId();
+//        }
+
+
+        //查询。放缓存
+        Page<Question> questionPage = this.page(new Page<>(current, size),
+                this.getQueryWrapperWithoutContent(questionQueryRequest));
+        Page<QuestionVO> questionVOPage = this.getQuestionVOPage(questionPage, loginUser);
+//        cacheClient.set(key, questionVOPage, RedisConstant.CACHE_QUESTION_PAGE_TTL, TimeUnit.MINUTES);
+        return questionVOPage;
+    }*/
+
+
+    /**
+     * 获取查询包装类 但是不要题目的详细信息
+     *
+     * @param questionQueryRequest
+     * @return
+     */
+    @Override
+    public QueryWrapper<Question> getQueryWrapperWithoutContent(QuestionQueryRequest questionQueryRequest) {
+        QueryWrapper<Question> queryWrapper = new QueryWrapper<>();
+        if (questionQueryRequest == null) {
+            return queryWrapper;
+        }
+        Long id = questionQueryRequest.getId();
+        String title = questionQueryRequest.getTitle();
+        List<String> tagList = questionQueryRequest.getTags();
+        String sortField = questionQueryRequest.getSortField();
+        String sortOrder = questionQueryRequest.getSortOrder();
+
+        // 拼接查询条件
+        queryWrapper.like(StringUtils.isNotBlank(title), "title", title);
+        if (CollectionUtils.isNotEmpty(tagList)) {
+            for (String tag : tagList) {
+                queryWrapper.like("tags", "\"" + tag + "\"");
+            }
+        }
+        queryWrapper.eq(ObjectUtils.isNotEmpty(id), "id", id);
+        queryWrapper.eq("isDelete", false);
+        queryWrapper.orderBy(SqlUtils.validSortField(sortField), sortOrder.equals(CommonConstant.SORT_ORDER_ASC),
+                sortField);
+        queryWrapper.select("id","title","tags","submitNum","acceptedNum");
+        return queryWrapper;
     }
 
     /**
@@ -127,20 +239,20 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
     }
 
 
-//    @Override
-//    public QuestionVO getQuestionVO(Question question, HttpServletRequest request) {
-//        QuestionVO questionVO = QuestionVO.objToVo(question);
-//        // 1. 关联查询用户信息
-//        Long userId = question.getUserId();
-//        User user = null;
-//        if (userId != null && userId > 0) {
-//            user = userService.getById(userId);
-//        }
-//        UserVO userVO = userService.getUserVO(user);
-//        questionVO.setUserVO(userVO);
-//        //返回
-//        return questionVO;
-//    }
+    //    @Override
+    //    public QuestionVO getQuestionVO(Question question, HttpServletRequest request) {
+    //        QuestionVO questionVO = QuestionVO.objToVo(question);
+    //        // 1. 关联查询用户信息
+    //        Long userId = question.getUserId();
+    //        User user = null;
+    //        if (userId != null && userId > 0) {
+    //            user = userService.getById(userId);
+    //        }
+    //        UserVO userVO = userService.getUserVO(user);
+    //        questionVO.setUserVO(userVO);
+    //        //返回
+    //        return questionVO;
+    //    }
 
     @Override
     public QuestionVO getQuestionVO(Question question) {
@@ -155,6 +267,18 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
         questionVO.setUserVO(userVO);
         //返回
         return questionVO;
+    }
+
+    @Override
+    public QuestionVO getQuestionVOById(long id) {
+        Question question = cacheClient.queryWithPassThrough(RedisConstant.CACHE_QUESTION, id, Question.class,
+                this::getById, RedisConstant.CACHE_QUESTION_TTL, TimeUnit.MINUTES);
+        if (question == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
+        //这里没装userVO，但是真感觉不需要
+        //        return this.getQuestionVO(question);
+        return QuestionVO.objToVo(question);
     }
 
     @Override
@@ -185,14 +309,40 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
     }
 
     @Override
-    public Page<QuestionVO> getQuestionVOPage(Page<Question> questionPage) {
+    public Page<QuestionVO> getQuestionVOPage(Page<Question> questionPage, User user) {
         List<Question> questionList = questionPage.getRecords();
         Page<QuestionVO> questionVOPage = new Page<>(questionPage.getCurrent(), questionPage.getSize(), questionPage.getTotal());
         if (CollectionUtils.isEmpty(questionList)) {
             return questionVOPage;
         }
         // 填充信息
-        List<QuestionVO> questionVOList = questionList.stream().map(QuestionVO::objToVo).collect(Collectors.toList());
+        //        List<QuestionVO> questionVOList = questionList.stream().map(QuestionVO::objToVo).collect(Collectors.toList());
+
+        List<Long> questionIdList = questionList.stream().map(Question::getId).collect(Collectors.toList());
+        Map<Long, Map<String,Long>> maps;
+        if (user != null) {
+            maps = userSubmitService.checkExistForQuestionIdsMapper(user.getId(), questionIdList);
+        } else {
+            maps = null;
+        }
+        if (maps != null && maps.size() == 1) {
+            if (maps.containsKey(null)) {
+                maps = null;
+            }
+        }
+
+        Map<Long, Map<String,Long>> finalMaps = maps;
+        List<QuestionVO> questionVOList = questionList.stream().map(question -> {
+            QuestionVO questionVO = QuestionVO.objToVo(question);
+            Long questionVOId = questionVO.getId();
+            if (finalMaps != null && finalMaps.containsKey(questionVOId)) {
+                Long i = finalMaps.get(questionVOId).get("count");
+                questionVO.setIsPass(i != 0);
+            }else{
+                questionVO.setIsPass(false);
+            }
+            return questionVO;
+        }).collect(Collectors.toList());
         questionVOPage.setRecords(questionVOList);
         return questionVOPage;
     }
@@ -226,7 +376,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         boolean result = this.updateById(question);
-        if(!result){
+        if (!result) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR);
         }
         return result;
@@ -255,41 +405,49 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
         Question oldQuestion = this.getById(id);
         ThrowUtils.throwIf(oldQuestion == null, ErrorCode.NOT_FOUND_ERROR);
         boolean result = this.updateById(question);
-        if(!result){
+        if (!result) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR);
         }
+        //删除缓存
+        cacheClient.deleteKey(RedisConstant.CACHE_QUESTION + id);
+        cacheClient.deleteKeyWithPrefix(RedisConstant.CACHE_QUESTION_PAGE);
         return result;
     }
 
     @Override
     public Question getQuestionAnswerById(long questionId, HttpServletRequest request) {
-        User loginUser = userService.getLoginUser(request);
-        if(loginUser == null){
+        User loginUser = userService.getLoginUserPermitNull(request);
+        if (loginUser == null) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         //查询用户是否提交过该题
         Long userId = loginUser.getId();
         QueryWrapper<QuestionSubmit> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("userId",userId).eq("questionId",questionId);
+        queryWrapper.eq("userId", userId).eq("questionId", questionId);
         long count = questionSubmitService.count(queryWrapper);
-        if(count == 0){
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR,"未提交过该题！");
+        if (count == 0) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "未提交过该题！");
         }
         //返回答案
 
         QueryWrapper<Question> questionQueryWrapper = new QueryWrapper<>();
-        questionQueryWrapper.eq("id",questionId);
-        questionQueryWrapper.select("id","answer");
+        questionQueryWrapper.eq("id", questionId);
+        questionQueryWrapper.select("id", "answer");
         Question question = this.getOne(questionQueryWrapper);
-        if(question == null){
+        if (question == null) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR);
         }
         return question;
     }
+
+    @Override
+    public boolean incrAcNum(Long questionId) {
+        UpdateWrapper<Question> questionUpdateWrapper = new UpdateWrapper<>();
+        questionUpdateWrapper.eq("id", questionId);
+        questionUpdateWrapper.setSql("acceptedNum = acceptedNum + 1");
+        boolean update = this.update(questionUpdateWrapper);
+        return update;
+    }
     //endregion
 
 }
-
-
-
-

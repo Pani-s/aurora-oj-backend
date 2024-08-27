@@ -23,22 +23,19 @@ spring:
     url: jdbc:mysql://${pani.mysql.host}:3306/${pani.mysql.dbname}?useUnicode=true&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
     username: ${pani.mysql.user:root}
     password: ${pani.mysql.pwd}
-  # Redis 配置
-  # todo 需替换配置，然后取消注释
-  #  redis:
-  #    database: 1
-  #    host: ${pani.redis.host}
-  #    port: 6379
-  #    timeout: 5000
-  #    password: ${pani.redis.pwd}
+    # Redis 配置
+    redis:
+      database: 1
+      host: ${pani.redis.host}
+      port: 6379
+      timeout: 5000
   # rabbitmq 配置
-  #  rabbitmq:
-  #    host: ${pani.rabbitmq.host}
-  #    port: 5672
-  #    username: pani
-  #    password: ${pani.rabbitmq.pwd}
+    rabbitmq:
+      host: ${pani.rabbitmq.host}
+      port: 5672
+      username: ${pani.rabbitmq.username}
+      password: ${pani.rabbitmq.pwd}
   # Elasticsearch 配置
-  # todo 需替换配置，然后取消注释
   #  elasticsearch:
   #    uris: http://${pani.es.uris-host}:9200
   #    username: ${pani.es.username}
@@ -71,6 +68,7 @@ mybatis-plus:
 
 # 对象存储
 cos:
+  urlPrefix: ${pani.cos.urlPrefix}
   qiniu:
     accessKey: ${pani.cos.qiniu.accessKey}
     secretKey: ${pani.cos.qiniu.secretKey}
@@ -93,3 +91,4 @@ yuapi:
 # 代码沙箱 类型配置
 codeSandbox:
   type: remote
+  remoteUrl: http://localhost:8105

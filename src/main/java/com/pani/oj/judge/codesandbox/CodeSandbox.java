@@ -1,7 +1,8 @@
 package com.pani.oj.judge.codesandbox;
 
-import com.pani.oj.judge.codesandbox.model.ExecuteCodeRequest;
-import com.pani.oj.judge.codesandbox.model.ExecuteCodeResponse;
+
+import com.pani.oj.model.sandbox.ExecuteCodeRequest;
+import com.pani.oj.model.sandbox.ExecuteCodeResponse;
 
 /**
  * @author Pani

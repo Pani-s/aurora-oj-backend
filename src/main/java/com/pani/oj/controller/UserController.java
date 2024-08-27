@@ -1,14 +1,18 @@
 package com.pani.oj.controller;
 
+import cn.hutool.core.io.FileUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.luciad.imageio.webp.WebPWriteParam;
 import com.pani.oj.annotation.AuthCheck;
 import com.pani.oj.common.BaseResponse;
 import com.pani.oj.common.DeleteRequest;
 import com.pani.oj.common.ErrorCode;
 import com.pani.oj.common.ResultUtils;
+import com.pani.oj.constant.FileConstant;
 import com.pani.oj.constant.UserConstant;
 import com.pani.oj.exception.BusinessException;
 import com.pani.oj.exception.ThrowUtils;
+import com.pani.oj.manager.CosManager;
 import com.pani.oj.model.dto.user.*;
 import com.pani.oj.model.entity.User;
 import com.pani.oj.model.vo.LoginUserVO;
@@ -18,9 +22,22 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
 import javax.servlet.http.HttpServletRequest;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -36,6 +53,14 @@ public class UserController {
 
     @Resource
     private UserService userService;
+
+    /**
+     * 定义合法的后缀列表
+     */
+    final List<String> validFileSuffixList = Arrays.asList("png", "jpg", "svg", "webp", "jpeg");
+
+    @Resource
+    private CosManager cosManager;
 
     // region 登录相关
 
@@ -172,6 +197,57 @@ public class UserController {
     }
 
     /**
+     * 更新头像
+     *
+     * @param request
+     * @return
+     */
+    @PostMapping("/update/avatar")
+    public BaseResponse<Boolean> updateAvatar(@RequestPart(value = "file") MultipartFile file, HttpServletRequest request) {
+
+        if (file == null || file.getSize() == 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+
+        User loginUser = userService.getLoginUser(request);
+        User user = new User();
+        user.setId(loginUser.getId());
+        ThrowUtils.throwIf(file.getSize() > 2 * FileConstant.ONE_MB, ErrorCode.PARAMS_ERROR, "文件过大，超过 2M");
+        String suffix = FileUtil.getSuffix(file.getOriginalFilename());
+        ThrowUtils.throwIf(!validFileSuffixList.contains(suffix), ErrorCode.PARAMS_ERROR, "文件后缀不合法");
+        try {
+            BufferedImage image = ImageIO.read(file.getInputStream());
+            ImageWriter writer = ImageIO.getImageWritersByMIMEType("image/webp").next();
+            WebPWriteParam writeParam = new WebPWriteParam(writer.getLocale());
+            writeParam.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+            // 设置有损压缩
+            writeParam.setCompressionType(writeParam.getCompressionTypes()[WebPWriteParam.LOSSY_COMPRESSION]);
+            //设置 70% 的质量. 设置范围 0-1
+            writeParam.setCompressionQuality(0.7f);
+            log.info("Save the image");
+            //方法二
+            // 1.将图像数据写入内存中的字节数组
+            ByteArrayOutputStream byteOutput = new ByteArrayOutputStream();
+            ImageOutputStream imageOutput = new MemoryCacheImageOutputStream(byteOutput);
+            writer.setOutput(imageOutput);
+            writer.write(null, new IIOImage(image, null, null), writeParam);
+            imageOutput.close();
+            byte[] imageData = byteOutput.toByteArray();
+            // 2. 使用字节数组创建输入流
+            InputStream inputStream = new ByteArrayInputStream(imageData);
+            String prefix = FileUtil.getPrefix(file.getOriginalFilename());
+            String avatarUrl = cosManager.putObject(inputStream, prefix + ".webp");
+            user.setUserAvatar(avatarUrl);
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "头像文件有误");
+        }
+
+        boolean result = userService.updateById(user);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
+    }
+
+    /**
      * 根据 id 获取用户（仅管理员）
      *
      * @param id
@@ -246,7 +322,7 @@ public class UserController {
         return ResultUtils.success(userVOPage);
     }
 
-    // endregion
+
 
     /**
      * 更新个人信息
@@ -269,4 +345,40 @@ public class UserController {
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
     }
+
+    /**
+     * 改密码
+     *
+     * @param userPwdUpdateMyRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/update/myPwd")
+    public BaseResponse<Boolean> updatePwdMyUser(@RequestBody UserPwdUpdateMyRequest userPwdUpdateMyRequest,
+                                                 HttpServletRequest request) {
+        if (userPwdUpdateMyRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean result = userService.changePwd(userPwdUpdateMyRequest, request);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
+    }
+
+    /**
+     * 重置密码
+     *
+     * @param userId
+     * @param request
+     * @return
+     */
+    @PostMapping("/reset/pwd")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> resetPassword(@RequestBody Long userId,
+                                               HttpServletRequest request) {
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        return ResultUtils.success(userService.resetPassword(userId));
+    }
+    // endregion
 }

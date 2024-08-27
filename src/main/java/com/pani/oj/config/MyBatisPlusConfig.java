@@ -10,7 +10,9 @@ import org.springframework.context.annotation.Configuration;
 /**
  * MyBatis Plus 配置
  *
- * @author https://github.com/liyupi
+ * @author Pani
+ * @date Created in 2024/3/17 12:24
+ * @description
  */
 @Configuration
 //@MapperScan("com.pani.oj.mapper")

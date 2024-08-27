@@ -1,6 +1,7 @@
 package com.pani.oj.judge.strategy;
 
-import com.pani.oj.judge.codesandbox.model.JudgeInfo;
+
+import com.pani.oj.model.sandbox.JudgeInfo;
 
 /**
  * @author Pani
@@ -8,6 +9,8 @@ import com.pani.oj.judge.codesandbox.model.JudgeInfo;
  * @description
  */
 public interface JudgeStrategy {
+    int DIVIDE_TO_KB = 1024;
+
     /**
      * 执行判题
      * @param judgeContext

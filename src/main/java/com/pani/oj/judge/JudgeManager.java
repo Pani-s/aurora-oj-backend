@@ -4,8 +4,8 @@ import com.pani.oj.judge.strategy.DefaultJudgeStrategy;
 import com.pani.oj.judge.strategy.JavaLangJudgeStrategy;
 import com.pani.oj.judge.strategy.JudgeContext;
 import com.pani.oj.judge.strategy.JudgeStrategy;
-import com.pani.oj.judge.codesandbox.model.JudgeInfo;
-import com.pani.oj.model.entity.QuestionSubmit;
+import com.pani.oj.model.enums.QuestionSubmitLanguageEnum;
+import com.pani.oj.model.sandbox.JudgeInfo;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,7 +24,7 @@ public class JudgeManager {
     JudgeInfo doJudge(JudgeContext judgeContext) {
         String language = judgeContext.getLanguage();
         JudgeStrategy judgeStrategy;
-        if ("java".equals(language)) {
+        if (QuestionSubmitLanguageEnum.JAVA.getValue().equals(language)) {
             judgeStrategy = new JavaLangJudgeStrategy();
         }else{
             judgeStrategy = new DefaultJudgeStrategy();

@@ -2,6 +2,7 @@ package com.pani.oj.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.pani.oj.model.dto.user.UserPwdUpdateMyRequest;
 import com.pani.oj.model.vo.LoginUserVO;
 import com.pani.oj.model.dto.user.UserQueryRequest;
 import com.pani.oj.model.entity.User;
@@ -108,5 +109,22 @@ public interface UserService extends IService<User> {
      * @return
      */
     QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
+
+    /**
+     * 个人用户修改密码
+     *
+     * @param userPwdUpdateMyRequest
+     * @param request
+     * @return
+     */
+    boolean changePwd(UserPwdUpdateMyRequest userPwdUpdateMyRequest, HttpServletRequest request);
+
+    /**
+     * 重置密码
+     *
+     * @param userId
+     * @return
+     */
+    boolean resetPassword(Long userId);
 
 }

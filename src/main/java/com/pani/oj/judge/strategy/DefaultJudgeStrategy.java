@@ -2,8 +2,8 @@ package com.pani.oj.judge.strategy;
 
 import com.pani.oj.model.dto.question.JudgeCase;
 import com.pani.oj.model.dto.question.JudgeConfig;
-import com.pani.oj.judge.codesandbox.model.JudgeInfo;
 import com.pani.oj.model.enums.JudgeInfoMessageEnum;
+import com.pani.oj.model.sandbox.JudgeInfo;
 
 import java.util.List;
 

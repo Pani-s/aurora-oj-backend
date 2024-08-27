@@ -7,20 +7,26 @@ import com.pani.oj.common.BaseResponse;
 import com.pani.oj.common.DeleteRequest;
 import com.pani.oj.common.ErrorCode;
 import com.pani.oj.common.ResultUtils;
+import com.pani.oj.constant.RedisConstant;
 import com.pani.oj.constant.UserConstant;
 import com.pani.oj.exception.BusinessException;
 import com.pani.oj.exception.ThrowUtils;
+import com.pani.oj.manager.RedisLimiterManager;
 import com.pani.oj.model.dto.question.*;
+import com.pani.oj.model.dto.questionsubmit.QuestionDebugRequest;
 import com.pani.oj.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.pani.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.pani.oj.model.entity.Question;
 import com.pani.oj.model.entity.QuestionSubmit;
 import com.pani.oj.model.entity.User;
+import com.pani.oj.model.vo.QuestionDebugResponse;
 import com.pani.oj.model.vo.QuestionSubmitVO;
 import com.pani.oj.model.vo.QuestionVO;
+import com.pani.oj.model.vo.Rank;
 import com.pani.oj.service.QuestionService;
 import com.pani.oj.service.QuestionSubmitService;
 import com.pani.oj.service.UserService;
+import com.pani.oj.service.UserSubmitService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
@@ -43,25 +49,25 @@ import java.util.List;
 public class QuestionController {
 
     @Resource
+    private RedisLimiterManager redisLimiterManager;
+
+    @Resource
     private QuestionService questionService;
 
     @Resource
     private UserService userService;
 
     @Resource
-    private QuestionSubmitService questionSubmitService;
+    private UserSubmitService userSubmitService;
 
-    //准备都用Hutool了
-//    private final static Gson GSON = new Gson();
+    @Resource
+    private QuestionSubmitService questionSubmitService;
 
     // region 增删改查
 
     /**
      * 创建
      *
-     * @param questionAddRequest
-     * @param request
-     * @return
      */
     @PostMapping("/add")
     public BaseResponse<Long> addQuestion(@RequestBody QuestionAddRequest questionAddRequest, HttpServletRequest request) {
@@ -94,9 +100,6 @@ public class QuestionController {
     /**
      * 删除 （仅本人或管理员）
      *
-     * @param deleteRequest
-     * @param request
-     * @return
      */
     @PostMapping("/delete")
     public BaseResponse<Boolean> deleteQuestion(@RequestBody DeleteRequest deleteRequest, HttpServletRequest request) {
@@ -109,7 +112,7 @@ public class QuestionController {
         Question oldQuestion = questionService.getById(id);
         ThrowUtils.throwIf(oldQuestion == null, ErrorCode.NOT_FOUND_ERROR);
         // 仅本人或管理员可删除
-        if (!oldQuestion.getUserId().equals(user.getId()) && !userService.isAdmin(request)) {
+        if (!oldQuestion.getUserId().equals(user.getId()) && !userService.isAdmin(user)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         boolean b = questionService.removeById(id);
@@ -117,10 +120,9 @@ public class QuestionController {
     }
 
     /**
+     * 前端用的是update
      * 更新（仅管理员）
      *
-     * @param questionUpdateRequest
-     * @return
      */
     @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
@@ -135,8 +137,6 @@ public class QuestionController {
     /**
      * 根据 id 获取 题目内容（只能管理员或者本人）
      *
-     * @param id
-     * @return
      */
     @GetMapping("/get")
     public BaseResponse<Question> getQuestionById(long id, HttpServletRequest request) {
@@ -159,28 +159,18 @@ public class QuestionController {
     /**
      * 根据 id 获取 题目VO（脱敏后）
      *
-     * @param id
-     * @return
      */
     @GetMapping("/get/vo")
     public BaseResponse<QuestionVO> getQuestionVOById(long id, HttpServletRequest request) {
         if (id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        Question question = questionService.getById(id);
-        if (question == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
-        }
-//        return ResultUtils.success(questionService.getQuestionVO(question, request));
-        return ResultUtils.success(questionService.getQuestionVO(question));
-
+        return ResultUtils.success(questionService.getQuestionVOById(id));
     }
 
     /**
      * 根据 id 获取 答案，前提是这个用户做过
      *
-     * @param id
-     * @return
      */
     @GetMapping("/get/answer")
     public BaseResponse<Question> getQuestionAnswerById(long id, HttpServletRequest request) {
@@ -192,33 +182,28 @@ public class QuestionController {
 
     /**
      * 分页获取列表（封装类）
-     *
-     * @param questionQueryRequest
-     * @param request
-     * @return
+     *QuestionVO中的UserVO没有填充
      */
     @PostMapping("/list/page/vo")
     public BaseResponse<Page<QuestionVO>> listQuestionVOByPage(@RequestBody QuestionQueryRequest questionQueryRequest,
-            HttpServletRequest request) {
-        long current = questionQueryRequest.getCurrent();
-        long size = questionQueryRequest.getPageSize();
-        // 限制爬虫
-        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
-        Page<Question> questionPage = questionService.page(new Page<>(current, size),
-                questionService.getQueryWrapper(questionQueryRequest));
-        return ResultUtils.success(questionService.getQuestionVOPage(questionPage));
+                                                               HttpServletRequest request) {
+        /*
+        其实题目列表缓存。。。是否需要说题目数更新了之后就删除缓存呢？不过题目信息的更新需要删除缓存
+         */
+        ThrowUtils.throwIf(questionQueryRequest == null,ErrorCode.PARAMS_ERROR);
+        //不支持以答案和内容查找
+        questionQueryRequest.setAnswer(null);
+        questionQueryRequest.setContent(null);
+        return ResultUtils.success(questionService.listQuestionVOByPage(questionQueryRequest,request));
     }
 
     /**
      * 分页获取当前用户创建的问题列表
      *
-     * @param questionQueryRequest
-     * @param request
-     * @return
      */
     @PostMapping("/my/list/page/vo")
     public BaseResponse<Page<QuestionVO>> listMyQuestionVOByPage(@RequestBody QuestionQueryRequest questionQueryRequest,
-            HttpServletRequest request) {
+                                                                 HttpServletRequest request) {
         if (questionQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -236,9 +221,6 @@ public class QuestionController {
     /**
      * 分页获取题目列表（仅管理员）
      *
-     * @param questionQueryRequest
-     * @param request
-     * @return
      */
     @PostMapping("/list/page")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
@@ -251,16 +233,9 @@ public class QuestionController {
         return ResultUtils.success(questionPage);
     }
 
-
-
-
-
     /**
      * 编辑题目的信息（用户）
      *
-     * @param questionEditRequest
-     * @param request
-     * @return
      */
     @PostMapping("/edit")
     public BaseResponse<Boolean> editQuestion(@RequestBody QuestionEditRequest questionEditRequest, HttpServletRequest request) {
@@ -274,7 +249,7 @@ public class QuestionController {
     // endregion
     //region 题目提交
     /**
-     * 提交题目
+     * 提交题目---异步
      * @return id
      */
     @PostMapping("/submit/do")
@@ -285,15 +260,33 @@ public class QuestionController {
         }
         // 登录才能操作
         final User loginUser = userService.getLoginUser(request);
+        //判定限流
+        redisLimiterManager.doRateLimit(RedisConstant.QUESTION_SUBMIT_LIMIT + loginUser.getId());
         long questionSubmitId = questionSubmitService.doQuestionSubmit(questionSubmitAddRequest, loginUser);
         return ResultUtils.success(questionSubmitId);
     }
 
     /**
+     * debug测试---同步
+     * @return id
+     */
+    @PostMapping("/submit/debug")
+    public BaseResponse<QuestionDebugResponse> doQuestionSubmitDebug(@RequestBody QuestionDebugRequest questionDebugRequest,
+                                                                     HttpServletRequest request) {
+        if (questionDebugRequest == null || questionDebugRequest.getQuestionId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 登录才能操作
+        final User loginUser = userService.getLoginUser(request);
+        //判定限流
+        redisLimiterManager.doRateLimit(RedisConstant.QUESTION_DEBUG_LIMIT + loginUser.getId());
+        QuestionDebugResponse questionDebugResponse = questionSubmitService.doQuestionDebug(questionDebugRequest);
+        return ResultUtils.success(questionDebugResponse);
+    }
+
+    /**
      * 分页获取题目提交列表（除了管理员外，普通用户只能看到非答案、提交代码等公开信息）
      * 该题目的提交列表---可以看代码，目前不能看提交用户名，我觉得还是匿名吧
-     * @param questionSubmitQueryRequest
-     * @param request
      */
     @PostMapping("/submit/list/page")
     public BaseResponse<Page<QuestionSubmitVO>> listSubmitQuestionByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
@@ -313,8 +306,6 @@ public class QuestionController {
 
     /**
      * 获取本人提交的题目
-     * @param questionSubmitQueryRequest
-     * @param request
      */
     @PostMapping("/submit/list/my/page")
     public BaseResponse<Page<QuestionSubmit>> listMySubmitQuestionByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
@@ -323,10 +314,7 @@ public class QuestionController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User loginUser = userService.getLoginUser(request);
-        if(!loginUser.getId().equals(questionSubmitQueryRequest.getUserId())){
-            //不是查询的本人
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
-        }
+        questionSubmitQueryRequest.setUserId(loginUser.getId());
 
         long current = questionSubmitQueryRequest.getCurrent();
         long size = questionSubmitQueryRequest.getPageSize();
@@ -340,8 +328,6 @@ public class QuestionController {
 
     /**
      * 所有人的所有题目提交记录，按照时间排序(【【公屏】】，所以只能看到【提交用户id（甚至匿名） 语言)
-     * @param questionSubmitQueryRequest
-     * @param request
      */
     @PostMapping("/submit/list/all/page")
     public BaseResponse<Page<QuestionSubmit>> listAllSubmitQuestionByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
@@ -357,6 +343,46 @@ public class QuestionController {
         //提交代码不给看了
         questionSubmitPage.getRecords().forEach((o) -> o.setCode(null));
         return ResultUtils.success(questionSubmitPage);
+    }
+
+    /**
+     * 重试修改失败的提交
+     */
+    @PostMapping("/submit/retry")
+    public BaseResponse<Boolean> retryMyErrorSubmit(@RequestBody DeleteRequest deleteRequest,
+                                                    HttpServletRequest request) {
+        if (deleteRequest == null || deleteRequest.getId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean b = questionSubmitService.retryMyErrorSubmit(deleteRequest.getId(), request);
+        return ResultUtils.success(b);
+    }
+
+    /**
+     * 删除修改失败的提交
+     */
+    @PostMapping("/submit/delete")
+    public BaseResponse<Boolean> delMyErrorSubmit(@RequestBody DeleteRequest deleteRequest,
+                                                  HttpServletRequest request) {
+        if (deleteRequest == null || deleteRequest.getId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        questionSubmitService.checkErrorQuestion(deleteRequest.getId(),request);
+        //删除
+        boolean b = questionSubmitService.removeById(deleteRequest.getId());
+        if(!b){
+            throw new BusinessException(ErrorCode.OPERATION_ERROR,"删除失败！");
+        }
+        return ResultUtils.success(b);
+    }
+    //endregion
+    //region rank
+    /**
+     * 获取每日排行榜 -- 新通过数
+     */
+    @GetMapping("/rank/daily/new")
+    public BaseResponse<List<Rank>> getDailyRankNewPass() {
+        return ResultUtils.success(userSubmitService.getDailyRankNewPass());
     }
     //endregion
 }

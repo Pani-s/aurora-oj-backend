@@ -15,8 +15,8 @@ import org.springframework.context.annotation.Configuration;
  * @description 从application.yml文件中读取前缀为"spring.redis"的配置项
  */
 //todo: 记得去pom里取消 Redisson 注释，还有下面的
-//@Configuration
-//@ConfigurationProperties(prefix = "spring.redis")
+@Configuration
+@ConfigurationProperties(prefix = "spring.redis")
 @Data
 public class RedissonConfig {
 
@@ -44,8 +44,8 @@ public class RedissonConfig {
                 // 设置redis的地址
                 .setAddress("redis://" + host + ":" + port)
                 // 设置redis的密码(redis有密码才设置)
-        //todo pwd
                 .setPassword(password);
+        //redis pwd.. 如果dev没有 配置文件就不写 这里也不会报错
 
         // 2.创建Redisson实例
         RedissonClient redisson = Redisson.create(config);

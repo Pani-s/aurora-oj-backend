@@ -8,10 +8,10 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * @author 讯飞星火
- * @Description todo:开启取消注释
+ * @Description
  */
-//@Configuration
-//@ConfigurationProperties(prefix = "xunfei.client")
+@Configuration
+@ConfigurationProperties(prefix = "xunfei.client")
 @Data
 public class XingHuoConfig {
     private String appid;

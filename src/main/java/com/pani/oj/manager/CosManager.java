@@ -1,11 +1,13 @@
 package com.pani.oj.manager;
 
+import com.baomidou.mybatisplus.annotation.EnumValue;
 import com.google.gson.Gson;
 import com.pani.oj.exception.BusinessException;
 import com.qiniu.common.QiniuException;
 import com.qiniu.http.Response;
 import com.qiniu.storage.UploadManager;
 import com.qiniu.storage.model.DefaultPutRet;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import com.pani.oj.common.ErrorCode;
 import javax.annotation.Resource;
@@ -26,12 +28,11 @@ public class CosManager {
     @Resource
     String upToken;
 
-    private String QINIU_IMAGE_DOMAIN = "http://pics.soogyu.xyz/";
+    @Value("${cos.urlPrefix:http://pics.soogyu.xyz/}")
+    private String QINIU_IMAGE_DOMAIN;
 
-    /**
-     * todo：目录
-     */
-    private String UPLOAD_DIR = "pani/bi/";
+    @Value("${cos.uploadDir:pani/oj/avatar/}")
+    private String UPLOAD_DIR;
 
     /**
      * 上传对象,，返回url

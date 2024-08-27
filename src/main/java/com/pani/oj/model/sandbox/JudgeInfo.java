@@ -1,4 +1,4 @@
-package com.pani.oj.judge.codesandbox.model;
+package com.pani.oj.model.sandbox;
 
 import lombok.Data;
 

@@ -2,8 +2,8 @@ package com.pani.oj.model.vo;
 
 import cn.hutool.json.JSONUtil;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.pani.oj.judge.codesandbox.model.JudgeInfo;
 import com.pani.oj.model.entity.QuestionSubmit;
+import com.pani.oj.model.sandbox.JudgeInfo;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;
 
