@@ -180,9 +180,6 @@ public class QuestionController {
     @ApiOperation("分页获取题目列表")
     public BaseResponse<Page<QuestionVO>> listQuestionVOByPage(@RequestBody QuestionQueryRequest questionQueryRequest,
                                                                HttpServletRequest request) {
-        /*
-        其实题目列表缓存。。。是否需要说题目数更新了之后就删除缓存呢？不过题目信息的更新需要删除缓存
-         */
         ThrowUtils.throwIf(questionQueryRequest == null,ErrorCode.PARAMS_ERROR);
         //不支持以答案和内容查找
         questionQueryRequest.setAnswer(null);

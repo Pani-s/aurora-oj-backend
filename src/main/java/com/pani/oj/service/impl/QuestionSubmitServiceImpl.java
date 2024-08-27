@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-
 import com.pani.oj.common.ErrorCode;
 import com.pani.oj.constant.CommonConstant;
 import com.pani.oj.constant.JudgeConstant;
@@ -79,15 +78,15 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         }
         //校检长度
         int length = questionSubmitAddRequest.getCode().length();
-        if(length > JudgeConstant.MAX_CODE_LEN){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户提交代码长度超出限制");
+        if (length > JudgeConstant.MAX_CODE_LEN) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户提交代码长度超出限制");
         }
 
         long questionId = questionSubmitAddRequest.getQuestionId();
         // 判断实体是否存在，根据类别获取实体
         Question question = questionService.getById(questionId);
         if (question == null) {
-            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR,"对应的题目不存在");
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "对应的题目不存在");
         }
 
         long userId = loginUser.getId();
@@ -104,29 +103,29 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "题目提交数据插入失败");
         }
         Long questionSubmitId = questionSubmit.getId();
-        log.info("题目提交信息初始化完成并存入数据库:{}",questionSubmit);
+        log.info("题目提交信息初始化完成并存入数据库:{}", questionSubmit);
 
         //题目提交数+1
         CompletableFuture.runAsync(() -> {
             UpdateWrapper<Question> questionUpdateWrapper = new UpdateWrapper<>();
-            questionUpdateWrapper.eq("id",questionId);
+            questionUpdateWrapper.eq("id", questionId);
             questionUpdateWrapper.setSql("submitNum = submitNum + 1");
             boolean update = questionService.update(questionUpdateWrapper);
-            if(!update){
-                log.error("数据库 - 题目提交数+1 失败：{}",questionId);
+            if (!update) {
+                log.error("数据库 - 题目提交数+1 失败：{}", questionId);
             }
         });
 
 
         //消息队列
-        log.info("题目提交信息发送至消息队列，id是:{}",questionSubmitId);
-        judgeMessageProducer.sendMessage(String.valueOf(questionSubmitId));
+        //        log.info("题目提交信息发送至消息队列，id是:{}",questionSubmitId);
+        //        judgeMessageProducer.sendMessage(String.valueOf(questionSubmitId));
 
         //异步执行判题服务
-        //        CompletableFuture.runAsync(() -> {
-        //            System.out.println("执行判题服务");
-        //            judgeFeignClient.doJudge(questionSubmitId);
-        //        });
+        CompletableFuture.runAsync(() -> {
+            log.info("执行判题服务:{}",questionSubmitId);
+            judgeService.doJudge(questionSubmitId);
+        });
 
         return questionSubmitId;
     }
@@ -134,12 +133,12 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     @Override
     public QuestionDebugResponse doQuestionDebug(QuestionDebugRequest questionDebugRequest) {
         int length = questionDebugRequest.getCode().length();
-        if(length > JudgeConstant.MAX_CODE_LEN){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户提交代码长度超出限制");
+        if (length > JudgeConstant.MAX_CODE_LEN) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户提交代码长度超出限制");
         }
         QuestionDebugResponse questionDebugResponse = judgeService.doDebug(questionDebugRequest);
         //todo : 解决一下远程调用后抛出的异常怎么接的问题。。
-        if(questionDebugResponse.getJudgeInfo() == null){
+        if (questionDebugResponse.getJudgeInfo() == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR);
         }
         return questionDebugResponse;
@@ -234,40 +233,40 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     }
 
     @Override
-    public void checkErrorQuestion(long questionSubmitId, HttpServletRequest request){
+    public void checkErrorQuestion(long questionSubmitId, HttpServletRequest request) {
         //检查用户在不在
         User loginUser = userService.getLoginUser(request);
-        ThrowUtils.throwIf(loginUser == null , ErrorCode.NOT_LOGIN_ERROR);
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
         //查找questionSubmit
         QuestionSubmit questionSubmit = this.getById(questionSubmitId);
-        ThrowUtils.throwIf(questionSubmit == null , ErrorCode.NOT_FOUND_ERROR,"题目提交信息不存在");
-        if(!questionSubmit.getUserId().equals(loginUser.getId())){
-            throw new BusinessException(ErrorCode.NO_AUTH_ERROR,"该题目提交信息不属于该用户！");
+        ThrowUtils.throwIf(questionSubmit == null, ErrorCode.NOT_FOUND_ERROR, "题目提交信息不存在");
+        if (!questionSubmit.getUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "该题目提交信息不属于该用户！");
         }
-        if(!questionSubmit.getStatus().equals(QuestionSubmitStatusEnum.ERROR.getValue())){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"该题目提交信息非ERROR状态");
+        if (!questionSubmit.getStatus().equals(QuestionSubmitStatusEnum.ERROR.getValue())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "该题目提交信息非ERROR状态");
         }
     }
 
     @Override
     public boolean retryMyErrorSubmit(long questionSubmitId, HttpServletRequest request) {
-        checkErrorQuestion(questionSubmitId,request);
+        checkErrorQuestion(questionSubmitId, request);
         //消息队列
-        log.info("Retry - 题目提交信息发送至消息队列，id是:{}",questionSubmitId);
+        log.info("Retry - 题目提交信息发送至消息队列，id是:{}", questionSubmitId);
         judgeMessageProducer.sendMessage(String.valueOf(questionSubmitId));
         return true;
     }
 
     @Override
     public QuestionSubmit getQuestionSubmitById(long questionSubmitId) {
-        log.info("getQuestionSubmitById：{}",questionSubmitId);
+        log.info("getQuestionSubmitById：{}", questionSubmitId);
         QuestionSubmit questionSubmit = this.getById(questionSubmitId);
-        if(questionSubmit == null){
+        if (questionSubmit == null) {
             log.info("查到空，悲伤，questionSubmit为null，手动再试一下");
             //手动再试一下
             questionSubmit = this.getById(questionSubmitId);
         }
-        log.info("之后questionSubmit：{}",questionSubmit);
+        log.info("之后questionSubmit：{}", questionSubmit);
         return questionSubmit;
     }
 }

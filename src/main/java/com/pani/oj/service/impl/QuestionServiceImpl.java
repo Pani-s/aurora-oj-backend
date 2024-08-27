@@ -410,7 +410,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
         }
         //删除缓存
         cacheClient.deleteKey(RedisConstant.CACHE_QUESTION + id);
-        cacheClient.deleteKeyWithPrefix(RedisConstant.CACHE_QUESTION_PAGE);
+//        cacheClient.deleteKeyWithPrefix(RedisConstant.CACHE_QUESTION_PAGE);
         return result;
     }
 

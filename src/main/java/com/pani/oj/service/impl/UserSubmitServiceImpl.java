@@ -54,7 +54,7 @@ public class UserSubmitServiceImpl extends ServiceImpl<UserSubmitMapper, UserSub
         userSubmit.setUserId(userId);
         userSubmit.setQuestionId(questionId);
         //同时需要删除这个用户question列表缓存
-        cacheClient.deleteKeyWithPrefix(RedisConstant.CACHE_QUESTION_PAGE + "*" + userId);
+//        cacheClient.deleteKeyWithPrefix(RedisConstant.CACHE_QUESTION_PAGE + "*" + userId);
         return this.save(userSubmit);
     }
 

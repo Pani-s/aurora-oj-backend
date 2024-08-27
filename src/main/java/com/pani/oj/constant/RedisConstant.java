@@ -8,7 +8,7 @@ package com.pani.oj.constant;
 public interface RedisConstant {
     //region 题目
     /**
-     * 题目页缓存
+     * 题目页缓存（已去除）
      */
     String CACHE_QUESTION_PAGE = "cache:question:page:";
     /**
